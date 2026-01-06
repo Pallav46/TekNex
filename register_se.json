@@ -1,0 +1,9 @@
+{
+  "name": "Ravi Kumar",
+  "email": "ravi.kumar@sales.com",
+  "password": "pass123",
+  "phone": "9876543210",
+  "address": "Delhi India",
+  "userType": "sales_executive",
+  "dealerId": 1
+}

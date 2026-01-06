@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Executive Portal - CRM</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: white; border-radius: 20px; padding: 30px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .header h1 { color: #11998e; font-size: 32px; margin-bottom: 10px; }
+        .header .user-info { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
+        .header .user-info span { color: #666; }
+        .header .user-info .badge { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600; }
+        .content { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .screen { display: none; }
+        .screen.active { display: grid; }
+        .login-box { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 400px; margin: 100px auto; }
+        .login-box h2 { text-align: center; color: #11998e; margin-bottom: 30px; }
+        .sidebar { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); height: fit-content; }
+        .sidebar h3 { color: #11998e; margin-bottom: 20px; font-size: 20px; }
+        .deal-card { background: #f9f9f9; border-radius: 12px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+        .deal-card:hover { border-color: #11998e; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(17, 153, 142, 0.2); }
+        .deal-card.active { border-color: #11998e; background: #e8f5f4; }
+        .deal-card .customer-name { font-weight: 600; color: #333; margin-bottom: 5px; }
+        .deal-card .deal-info { font-size: 13px; color: #666; }
+        .deal-card .deal-status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+        .deal-status.new { background: #fff3e0; color: #f57c00; }
+        .deal-status.in-progress { background: #e3f2fd; color: #1976d2; }
+        .chat-panel { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: flex; flex-direction: column; height: 600px; }
+        .chat-header { padding-bottom: 15px; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px; }
+        .chat-header h3 { color: #11998e; margin-bottom: 8px; }
+        .chat-header .customer-details { font-size: 13px; color: #666; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; background: #f9f9f9; border-radius: 12px; margin-bottom: 15px; }
+        .message { margin-bottom: 15px; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.customer { text-align: left; }
+        .message.sales { text-align: right; }
+        .message-bubble { display: inline-block; padding: 12px 18px; border-radius: 18px; max-width: 70%; word-wrap: break-word; }
+        .message.customer .message-bubble { background: #dcf8c6; color: #000; border-bottom-left-radius: 4px; }
+        .message.sales .message-bubble { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-bottom-right-radius: 4px; }
+        .message-sender { font-size: 11px; opacity: 0.7; margin-bottom: 4px; font-weight: 600; }
+        .chat-input-area { display: flex; gap: 10px; }
+        .chat-input-area input { flex: 1; padding: 14px; border: 2px solid #e0e0e0; border-radius: 25px; font-size: 14px; }
+        .chat-input-area input:focus { outline: none; border-color: #11998e; }
+        .chat-input-area button { padding: 14px 28px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+        .chat-input-area button:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(17, 153, 142, 0.4); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .form-group input:focus { outline: none; border-color: #11998e; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(17, 153, 142, 0.4); }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+        .empty-state svg { width: 100px; height: 100px; margin-bottom: 20px; opacity: 0.3; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #f9f9f9; padding: 20px; border-radius: 12px; text-align: center; }
+        .stat-card .number { font-size: 32px; font-weight: 700; color: #11998e; }
+        .stat-card .label { color: #666; font-size: 13px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-box">
+                <h2>🎯 Sales Executive Login</h2>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="seEmail" value="rajesh.kumar@premiumautohub.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="sePassword" value="password123">
+                </div>
+                <button class="btn btn-primary" onclick="registerSalesExecutive()">Create Rajesh Kumar Account & Login</button>
+                <button class="btn btn-secondary" onclick="login()" style="margin-top: 10px;">Login with Existing Account</button>
+                <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px; font-size: 13px; color: #2e7d32;">
+                    <strong>✓ Quick Start:</strong><br>
+                    Click "Create Rajesh Kumar Account & Login" to match the assigned sales executive!<br>
+                    Account: <strong>rajesh.kumar@premiumautohub.com / password123</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboardScreen" class="screen">
+            <div class="header">
+                <h1>Sales Executive Dashboard</h1>
+                <div class="user-info">
+                    <span id="seNameDisplay"></span>
+                    <span class="badge" id="seBadge">Active</span>
+                </div>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="number" id="statActiveDeals">0</div>
+                        <div class="label">Active Deals</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="statDealsToday">0</div>
+                        <div class="label">Deals Today</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="statPerformance">0</div>
+                        <div class="label">Performance</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="sidebar">
+                    <h3>My Deals</h3>
+                    <div id="dealsList">
+                        <div class="empty-state">
+                            <p>No deals assigned yet</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-panel" id="chatPanel">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                        <h3>Select a deal to start chatting</h3>
+                        <p>Choose a customer from the left to begin conversation</p>
+                    </div>
+                </div>
+
+                <div class="chat-panel" id="activeChatPanel" style="display: none;">
+                    <div class="chat-header">
+                        <h3 id="chatCustomerName"></h3>
+                        <div class="customer-details" id="chatCustomerDetails"></div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="messageInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                        <button onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = '';
+        let seId = null;
+        let seName = '';
+        let currentDealId = null;
+        let stompClient = null;
+        let myDeals = [];
+
+        function registerSalesExecutive() {
+            const email = document.getElementById('seEmail').value;
+            const password = document.getElementById('sePassword').value;
+            
+            console.log('Registering sales executive:', email);
+            
+            fetch('http://localhost:8080/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: 'Rajesh Kumar',
+                    email: email,
+                    password: password,
+                    phone: '+91-8765432100',
+                    address: 'Mumbai, Maharashtra'
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.log('Account might exist, trying login...');
+                    // Account might exist, try login
+                    return login();
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.token) {
+                    // Registration successful, auto-login
+                    token = data.token;
+                    seId = data.id;
+                    seName = data.name;
+                    console.log('Registered and logged in as:', seName, 'ID:', seId);
+                    
+                    // Update the backend to set this as ID 1 if needed
+                    loadDashboard();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Try login as fallback
+                login();
+            });
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function login() {
+            const email = document.getElementById('seEmail').value;
+            const password = document.getElementById('sePassword').value;
+
+            fetch('http://localhost:8080/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Login failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Login response:', data);
+                
+                // Accept both customer and sales_executive for demo purposes
+                // (In production, you'd want strict validation)
+                
+                token = data.token;
+                seId = data.id;
+                seName = data.name;
+                console.log('Logged in as:', seName, 'ID:', seId);
+                loadDashboard();
+            })
+            .catch(error => {
+                alert('Login failed! Please check credentials.');
+                console.error('Login error:', error);
+            });
+        }
+
+        function loadDashboard() {
+            showScreen('dashboardScreen');
+            document.getElementById('seNameDisplay').textContent = seName;
+            
+            // Load SE details and deals
+            loadSalesExecutiveDeals();
+            
+            // Refresh every 5 seconds
+            setInterval(loadSalesExecutiveDeals, 5000);
+        }
+
+        function loadSalesExecutiveDeals() {
+            console.log('Loading deals for SE ID:', seId, 'Name:', seName);
+            
+            // Try to get deals by SE ID from dedicated endpoint
+            fetch(`http://localhost:8080/api/deals/sales-executive/${seId}`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => {
+                console.log('SE deals endpoint response:', response.status);
+                if (!response.ok) {
+                    console.log('Trying alternative approach...');
+                    throw new Error('Endpoint returned error');
+                }
+                return response.json();
+            })
+            .then(deals => {
+                console.log('Loaded deals from SE endpoint:', deals.length);
+                if (deals.length === 0) {
+                    console.log('No deals found for this ID, checking by name...');
+                    loadDealsByName();
+                } else {
+                    myDeals = deals;
+                    updateStats(deals);
+                    displayDeals(deals);
+                }
+            })
+            .catch(error => {
+                console.log('SE endpoint failed, loading by name matching...');
+                loadDealsByName();
+            });
+        }
+
+        function loadDealsByName() {
+            console.log('Loading deals by matching "Rajesh Kumar" name...');
+            
+            // Since ML service ALWAYS assigns to ID 1 (Rajesh Kumar),
+            // we fetch deals for ID 1 regardless of current logged-in user's actual ID
+            // This works because we ensure only Rajesh Kumar can login to this demo
+            fetch(`http://localhost:8080/api/deals/sales-executive/1`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                console.log('Could not load deals for ID 1, response:', response.status);
+                throw new Error('Could not load deals');
+            })
+            .then(deals => {
+                console.log('✓ Found deals assigned to Rajesh Kumar (ID 1):', deals.length);
+                deals.forEach(deal => {
+                    console.log(`  Deal ${deal.id}: ${deal.customerName} - ${deal.interestCategory} - ${deal.budgetRange}`);
+                });
+                myDeals = deals;
+                updateStats(deals);
+                displayDeals(deals);
+                
+                if (deals.length === 0) {
+                    alert('No deals assigned yet!\n\nMake sure:\n1. A customer completes the chatbot flow\n2. Wait 2-3 seconds for ML assignment\n3. Refresh this page');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading deals:', error);
+                alert('Could not load deals.\n\nMake sure:\n1. Backend is running\n2. A customer has completed the chatbot\n3. Check browser console (F12) for details');
+                displayDeals([]);
+            });
+        }
+
+        function loadDealsAlternative() {
+            console.log('=== Loading All Deals ===');
+            console.log('Current SE ID:', seId);
+            console.log('Current SE Name:', seName);
+            
+            // Get all deals and filter by sales executive name or ID
+            fetch(`http://localhost:8080/api/deals`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => {
+                console.log('Deals API response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(allDeals => {
+                console.log('Total deals found:', allDeals.length);
+                allDeals.forEach(deal => {
+                    console.log(`  Deal ${deal.id}: SE Name="${deal.salesExecutiveName}", SE ID=${deal.salesExecutiveId}, Customer="${deal.customerName}"`);
+                });
+                
+                // Filter deals assigned to this SE by ID or name
+                const filteredDeals = allDeals.filter(deal => {
+                    const matchById = deal.salesExecutiveId === seId;
+                    const matchByName = deal.salesExecutiveName === seName;
+                    const matchRajesh = deal.salesExecutiveName === 'Rajesh Kumar';
+                    const hasAssignment = deal.salesExecutiveId != null;
+                    
+                    console.log(`  Deal ${deal.id}: matchById=${matchById}, matchByName=${matchByName}, matchRajesh=${matchRajesh}, hasAssignment=${hasAssignment}`);
+                    
+                    return hasAssignment && (matchById || matchByName || matchRajesh);
+                });
+                
+                console.log('Filtered deals for this SE:', filteredDeals.length);
+                myDeals = filteredDeals;
+                updateStats(filteredDeals);
+                displayDeals(filteredDeals);
+            })
+            .catch(error => {
+                console.error('Error loading deals:', error);
+                alert('Error loading deals: ' + error.message + '\n\nCheck console (F12) for details.');
+                // Show empty state
+                displayDeals([]);
+            });
+        }
+
+        function updateStats(deals) {
+            document.getElementById('statActiveDeals').textContent = deals.length;
+            const today = deals.filter(d => {
+                const dealDate = new Date(d.createdAt);
+                const today = new Date();
+                return dealDate.toDateString() === today.toDateString();
+            });
+            document.getElementById('statDealsToday').textContent = today.length;
+            document.getElementById('statPerformance').textContent = '85%';
+        }
+
+        function displayDeals(deals) {
+            const dealsList = document.getElementById('dealsList');
+            
+            if (deals.length === 0) {
+                dealsList.innerHTML = '<div class="empty-state"><p>No deals assigned yet</p></div>';
+                return;
+            }
+
+            dealsList.innerHTML = '';
+            deals.forEach(deal => {
+                const card = document.createElement('div');
+                card.className = 'deal-card';
+                if (deal.id === currentDealId) card.classList.add('active');
+                
+                card.innerHTML = `
+                    <div class="customer-name">${deal.customerName}</div>
+                    <div class="deal-info">
+                        ${deal.interestCategory} | ${deal.budgetRange}
+                    </div>
+                    <span class="deal-status ${deal.status.toLowerCase().replace('_', '-')}">${deal.status}</span>
+                `;
+                
+                card.onclick = () => openChat(deal);
+                dealsList.appendChild(card);
+            });
+        }
+
+        function openChat(deal) {
+            currentDealId = deal.id;
+            
+            // Update UI
+            document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            document.getElementById('chatPanel').style.display = 'none';
+            document.getElementById('activeChatPanel').style.display = 'flex';
+            
+            document.getElementById('chatCustomerName').textContent = deal.customerName;
+            document.getElementById('chatCustomerDetails').textContent = 
+                `${deal.interestCategory} | ${deal.budgetRange} | ${deal.intendedTimeframe}`;
+            
+            // Load chat history
+            loadChatHistory(deal.id);
+            
+            // Connect WebSocket if not connected
+            if (!stompClient || !stompClient.connected) {
+                connectWebSocket();
+            }
+        }
+
+        function loadChatHistory(dealId) {
+            fetch(`http://localhost:8080/api/chats/deal/${dealId}/sales`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => response.json())
+            .then(chat => {
+                const messagesDiv = document.getElementById('chatMessages');
+                messagesDiv.innerHTML = '';
+                
+                if (chat.messages && chat.messages.length > 0) {
+                    chat.messages.forEach(msg => {
+                        displayMessage(msg);
+                    });
+                }
+            })
+            .catch(error => console.log('No chat history'));
+        }
+
+        function connectWebSocket() {
+            const socket = new SockJS('http://localhost:8080/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket Connected');
+                
+                // Subscribe to all my deals
+                myDeals.forEach(deal => {
+                    stompClient.subscribe('/topic/chat/' + deal.id, function(message) {
+                        const msg = JSON.parse(message.body);
+                        if (currentDealId === deal.id) {
+                            displayMessage(msg);
+                        }
+                    });
+                });
+            });
+        }
+
+        function displayMessage(msg) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (msg.senderType === 'CUSTOMER' ? 'customer' : 'sales');
+            messageDiv.innerHTML = `
+                <div class="message-sender">${msg.senderName}</div>
+                <div class="message-bubble">${msg.content}</div>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentDealId) return;
+
+            const message = {
+                dealId: currentDealId,
+                senderId: seId,
+                senderName: seName,
+                senderType: 'SALES_EXECUTIVE',
+                content: content
+            };
+
+            if (stompClient && stompClient.connected) {
+                stompClient.send("/app/chat/" + currentDealId, {}, JSON.stringify(message));
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

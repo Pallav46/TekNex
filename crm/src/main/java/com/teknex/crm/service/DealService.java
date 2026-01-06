@@ -36,9 +36,19 @@ public class DealService {
     @Autowired
     private KafkaProducerService kafkaProducerService;
     
+    @Autowired
+    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    
     public Deal initiateDeal(BotChatRequest request) {
+        log.info("=== Initiating new deal ===");
+        log.info("Customer ID: {}", request.getCustomerId());
+        log.info("Interest: {}, Budget: {}, Timeframe: {}", 
+                request.getInterestCategory(), request.getBudgetRange(), request.getIntendedTimeframe());
+        
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
+        
+        log.info("Found customer: {} ({})", customer.getName(), customer.getEmail());
         
         // Create initial deal
         Deal deal = Deal.builder()
@@ -59,6 +69,7 @@ public class DealService {
                 .build();
         
         deal = dealRepository.save(deal);
+        log.info("Deal created with ID: {}", deal.getId());
         
         // Create initial bot chat
         Chat chat = Chat.builder()
@@ -71,8 +82,10 @@ public class DealService {
                 .build();
         
         chatRepository.save(chat);
+        log.info("Bot chat created for deal: {}", deal.getId());
         
         // Send request to ML service to match sales executive
+        log.info("Building Kafka match request for deal: {}", deal.getId());
         SalesExecutiveMatchRequest matchRequest = SalesExecutiveMatchRequest.builder()
                 .dealId(deal.getId())
                 .customerId(customer.getId())
@@ -84,13 +97,15 @@ public class DealService {
                 .preferredContactMode(request.getPreferredContactMode())
                 .build();
         
+        log.info("Sending Kafka match request...");
         kafkaProducerService.sendSalesExecutiveMatchRequest(matchRequest);
         
-        log.info("Deal initiated: {}", deal.getId());
+        log.info("Deal initiated successfully: {}", deal.getId());
         return deal;
     }
     
     public Deal assignSalesExecutive(String dealId, Long salesExecutiveId) {
+        log.info("=== Assigning sales executive {} to deal {} ===", salesExecutiveId, dealId);
         Deal deal = dealRepository.findById(dealId)
                 .orElseThrow(() -> new RuntimeException("Deal not found"));
         
@@ -125,6 +140,14 @@ public class DealService {
         // Update sales executive stats
         salesExecutive.setActiveDeals(salesExecutive.getActiveDeals() + 1);
         salesExecutiveRepository.save(salesExecutive);
+        
+        // Send WebSocket notification to customer
+        log.info("Sending WebSocket notification to customer for deal: {}", dealId);
+        messagingTemplate.convertAndSend("/topic/deal/" + dealId + "/assignment", deal);
+        
+        // Send WebSocket notification to sales executive about new customer
+        log.info("Sending WebSocket notification to sales executive {} for new customer", salesExecutiveId);
+        messagingTemplate.convertAndSend("/topic/sales-executive/" + salesExecutiveId + "/new-customer", deal);
         
         log.info("Sales executive assigned to deal: {}", dealId);
         return deal;

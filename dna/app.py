@@ -24,6 +24,11 @@ def calculate_health_score(deal_dna_data):
     This is a dummy implementation that uses random scores.
     In a real system, this would use ML models trained on historical deal data.
     """
+    print(f"=== Calculating Health Score ===")
+    print(f"Deal DNA data keys: {deal_dna_data.keys()}")
+    
+    deal_id = deal_dna_data.get('dealId')
+    print(f"Deal ID: {deal_id}")
     
     # Simulate health score calculation (0-100)
     # In reality, this would analyze:
@@ -50,52 +55,66 @@ def calculate_health_score(deal_dna_data):
     else:
         recommendation = "Deal in progress. Continue standard engagement."
     
-    return {
+    response = {
+        "dealId": deal_id,  # CRITICAL: Include dealId
         "healthScore": round(base_score, 2),
         "criticalThreshold": round(critical_threshold, 2),
         "opportunityThreshold": round(opportunity_threshold, 2),
         "recommendation": recommendation
     }
+    
+    print(f"Health score response: {response}")
+    return response
 
 
 def consume_health_score_requests():
     """
     Kafka consumer to listen for health score calculation requests
     """
-    consumer = KafkaConsumer(
-        'health-score-request',
-        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-        value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-        auto_offset_reset='earliest',
-        enable_auto_commit=True,
-        group_id='deal-dna-analyzer-group'
-    )
+    print(f"=== Starting Kafka Consumer ===")
+    print(f"Kafka Servers: {KAFKA_BOOTSTRAP_SERVERS}")
+    print(f"Topic: health-score-request")
     
-    print("Deal DNA Analyzer - Listening for health score requests...")
-    
-    for message in consumer:
-        try:
-            request_data = message.value
-            print(f"Received health score request: {request_data}")
-            
-            # Calculate health score and thresholds
-            score_data = calculate_health_score(request_data)
-            
-            # Add deal ID to response
-            response = {
-                "dealId": request_data.get("dealId"),
-                "dealDnaId": request_data.get("dealDnaId"),
-                **score_data
-            }
-            
-            # Send response back to CRM
-            producer.send('health-score-response', response)
-            producer.flush()
-            
-            print(f"Sent health score response: {response}")
-            
-        except Exception as e:
-            print(f"Error processing health score request: {e}")
+    try:
+        consumer = KafkaConsumer(
+            'health-score-request',
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            auto_offset_reset='earliest',
+            enable_auto_commit=True,
+            group_id='deal-dna-analyzer-group',
+            request_timeout_ms=30000,
+            session_timeout_ms=10000,
+            heartbeat_interval_ms=3000,
+            api_version=(0, 10, 1)
+        )
+        
+        print("✓ Kafka Consumer Connected! Listening for health score requests...")
+        
+        for message in consumer:
+            try:
+                request_data = message.value
+                print(f"=== Received health score request ===")
+                print(f"Message: {request_data}")
+                
+                # Calculate health score and thresholds
+                response = calculate_health_score(request_data)
+                
+                # Send response back to CRM
+                print(f"Sending response to Kafka: {response}")
+                producer.send('health-score-response', response)
+                producer.flush()
+                
+                print(f"✓ Response sent successfully")
+                
+            except Exception as e:
+                print(f"✗ Error processing health score request: {e}")
+                import traceback
+                traceback.print_exc()
+    except Exception as e:
+        print(f"✗ Error connecting to Kafka: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @app.route('/health', methods=['GET'])
@@ -142,5 +161,5 @@ if __name__ == '__main__':
     consumer_thread = threading.Thread(target=consume_health_score_requests, daemon=True)
     consumer_thread.start()
     
-    # Start Flask app
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    # Start Flask app (debug=False to prevent reloading that kills daemon threads)
+    app.run(host='0.0.0.0', port=5002, debug=False, use_reloader=False)

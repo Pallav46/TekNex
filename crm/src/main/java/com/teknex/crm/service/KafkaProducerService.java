@@ -15,12 +15,38 @@ public class KafkaProducerService {
     private KafkaTemplate<String, Object> kafkaTemplate;
     
     public void sendSalesExecutiveMatchRequest(SalesExecutiveMatchRequest request) {
-        log.info("Sending sales executive match request to Kafka: {}", request);
-        kafkaTemplate.send("sales-executive-match-request", request);
+        try {
+            log.info("=== Sending sales executive match request to Kafka ===");
+            log.info("Deal ID: {}", request.getDealId());
+            log.info("Customer ID: {}", request.getCustomerId());
+            log.info("Interest: {}, Budget: {}", request.getInterestCategory(), request.getBudgetRange());
+            kafkaTemplate.send("sales-executive-match-request", request)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to send sales executive match request: {}", ex.getMessage(), ex);
+                    } else {
+                        log.info("Successfully sent sales executive match request for deal: {}", request.getDealId());
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Exception while sending sales executive match request: {}", e.getMessage(), e);
+        }
     }
     
     public void sendHealthScoreRequest(HealthScoreRequest request) {
-        log.info("Sending health score request to Kafka: {}", request);
-        kafkaTemplate.send("health-score-request", request);
+        try {
+            log.info("=== Sending health score request to Kafka ===");
+            log.info("Deal ID: {}", request.getDealId());
+            kafkaTemplate.send("health-score-request", request)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to send health score request: {}", ex.getMessage(), ex);
+                    } else {
+                        log.info("Successfully sent health score request for deal: {}", request.getDealId());
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Exception while sending health score request: {}", e.getMessage(), e);
+        }
     }
 }

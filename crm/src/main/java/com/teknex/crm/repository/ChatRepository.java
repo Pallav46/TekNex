@@ -9,8 +9,9 @@ import java.util.Optional;
 
 @Repository
 public interface ChatRepository extends MongoRepository<Chat, String> {
-    Optional<Chat> findByDealId(String dealId);
+    List<Chat> findByDealId(String dealId);
     List<Chat> findByCustomerId(Long customerId);
     List<Chat> findBySalesExecutiveId(Long salesExecutiveId);
     List<Chat> findByChatType(Chat.ChatType chatType);
+    List<Chat> findByDealIdAndChatType(String dealId, Chat.ChatType chatType);
 }

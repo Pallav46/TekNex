@@ -19,8 +19,14 @@ public class ChatController {
     private ChatService chatService;
     
     @GetMapping("/deal/{dealId}")
-    public ResponseEntity<Chat> getChatByDealId(@PathVariable String dealId) {
-        Chat chat = chatService.getChatByDealId(dealId);
+    public ResponseEntity<List<Chat>> getChatsByDealId(@PathVariable String dealId) {
+        List<Chat> chats = chatService.getChatsByDealId(dealId);
+        return ResponseEntity.ok(chats);
+    }
+    
+    @GetMapping("/deal/{dealId}/sales")
+    public ResponseEntity<Chat> getSalesExecutiveChat(@PathVariable String dealId) {
+        Chat chat = chatService.getSalesExecutiveChatByDealId(dealId);
         return ResponseEntity.ok(chat);
     }
     

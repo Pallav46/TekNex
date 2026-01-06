@@ -5,6 +5,7 @@ import com.teknex.crm.model.Chat;
 import com.teknex.crm.repository.ChatRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,14 +19,29 @@ public class ChatService {
     @Autowired
     private ChatRepository chatRepository;
     
-    public Chat getChatByDealId(String dealId) {
-        return chatRepository.findByDealId(dealId)
-                .orElseThrow(() -> new RuntimeException("Chat not found for deal: " + dealId));
+    @Autowired(required = false)
+    private SimpMessagingTemplate messagingTemplate;
+    
+    public List<Chat> getChatsByDealId(String dealId) {
+        return chatRepository.findByDealId(dealId);
+    }
+    
+    public Chat getSalesExecutiveChatByDealId(String dealId) {
+        List<Chat> chats = chatRepository.findByDealIdAndChatType(dealId, Chat.ChatType.SALES_EXECUTIVE);
+        if (chats.isEmpty()) {
+            throw new RuntimeException("Sales executive chat not found for deal: " + dealId);
+        }
+        return chats.get(0);
     }
     
     public Chat addMessage(ChatMessageRequest request) {
-        Chat chat = chatRepository.findByDealId(request.getDealId())
-                .orElseThrow(() -> new RuntimeException("Chat not found"));
+        List<Chat> chats = chatRepository.findByDealId(request.getDealId());
+        
+        // Find the sales executive chat
+        Chat chat = chats.stream()
+                .filter(c -> c.getChatType() == Chat.ChatType.SALES_EXECUTIVE)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Sales executive chat not found"));
         
         if (chat.getMessages() == null) {
             chat.setMessages(new ArrayList<>());
@@ -34,7 +50,7 @@ public class ChatService {
         Chat.Message message = Chat.Message.builder()
                 .senderId(request.getSenderId() != null ? request.getSenderId().toString() : "bot")
                 .senderName(request.getSenderName())
-                .senderType(Chat.Message.SenderType.valueOf(request.getSenderType()))
+                .senderType(Chat.Message.SenderType.valueOf(request.getSenderType().toUpperCase()))
                 .content(request.getContent())
                 .timestamp(LocalDateTime.now())
                 .build();

@@ -25,4 +25,10 @@ public class CustomerRegistrationRequest {
     
     private String phone;
     private String address;
+    
+    // "customer" or "sales_executive"
+    private String userType;
+    
+    // Required for sales_executive registration
+    private Long dealerId;
 }

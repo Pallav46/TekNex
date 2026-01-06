@@ -11,6 +11,7 @@ import java.util.Optional;
 @Repository
 public interface SalesExecutiveRepository extends JpaRepository<SalesExecutive, Long> {
     Optional<SalesExecutive> findByEmail(String email);
+    boolean existsByEmail(String email);
     List<SalesExecutive> findByAvailableTrue();
     List<SalesExecutive> findByDealerId(Long dealerId);
     
