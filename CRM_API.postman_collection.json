@@ -1,0 +1,397 @@
+{
+  "info": {
+    "name": "CRM System API",
+    "description": "Complete CRM API for hackathon demonstration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dealId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('token', jsonData.token);",
+                  "    pm.collectionVariables.set('customerId', jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"email\": \"test{{$timestamp}}@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"+91-9999999999\",\n  \"address\": \"Mumbai, India\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('token', jsonData.token);",
+                  "    pm.collectionVariables.set('customerId', jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"arjun.mehta@example.com\",\n  \"password\": \"customer123\",\n  \"userType\": \"customer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Sales Executive",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('token', jsonData.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rajesh.kumar@premiumautohub.com\",\n  \"password\": \"password123\",\n  \"userType\": \"sales_executive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deals",
+      "item": [
+        {
+          "name": "Initiate Deal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('dealId', jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"interestCategory\": \"SUV\",\n  \"budgetRange\": \"15-20 lakhs\",\n  \"intendedTimeframe\": \"1-2 months\",\n  \"preferredContactMode\": \"phone\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/deals/initiate",
+              "host": ["{{baseUrl}}"],
+              "path": ["deals", "initiate"]
+            }
+          }
+        },
+        {
+          "name": "Assign Sales Executive",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/assign?dealId={{dealId}}&salesExecutiveId=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["deals", "assign"],
+              "query": [
+                {
+                  "key": "dealId",
+                  "value": "{{dealId}}"
+                },
+                {
+                  "key": "salesExecutiveId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Deal",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dealId\": \"{{dealId}}\",\n  \"status\": \"IN_PROGRESS\",\n  \"note\": \"Customer showed strong interest in SUV models\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/deals/update",
+              "host": ["{{baseUrl}}"],
+              "path": ["deals", "update"]
+            }
+          }
+        },
+        {
+          "name": "Get Deal By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["deals", "{{dealId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Deals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/customer/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["deals", "customer", "{{customerId}}"]
+            }
+          }
+        },
+        {
+          "name": "Request Health Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}/request-health-score",
+              "host": ["{{baseUrl}}"],
+              "path": ["deals", "{{dealId}}", "request-health-score"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Send Message (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dealId\": \"{{dealId}}\",\n  \"senderId\": {{customerId}},\n  \"senderName\": \"Test Customer\",\n  \"senderType\": \"CUSTOMER\",\n  \"content\": \"I'm interested in scheduling a test drive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chats/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["chats", "message"]
+            }
+          }
+        },
+        {
+          "name": "Get Chat By Deal ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chats/deal/{{dealId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["chats", "deal", "{{dealId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales Executives",
+      "item": [
+        {
+          "name": "Get All Sales Executives",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales-executives",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales-executives"]
+            }
+          }
+        },
+        {
+          "name": "Get Available Sales Executives",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales-executives/available",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales-executives", "available"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dealers",
+      "item": [
+        {
+          "name": "Get All Dealers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dealers",
+              "host": ["{{baseUrl}}"],
+              "path": ["dealers"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
