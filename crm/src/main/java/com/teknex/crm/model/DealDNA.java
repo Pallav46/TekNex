@@ -57,9 +57,17 @@ public class DealDNA {
     
     // Engagement Indicators
     private Boolean testDriveRequested;
+    private Boolean testDriveCompleted;
     private Boolean priceNegotiated;
     private Boolean financeDiscussed;
     private Boolean appointmentScheduled;
+
+    // Deal stage progression
+    private String currentStage;
+    private Boolean paperworkCompleted;
+    private Boolean deliveryCompleted;
+    private Boolean dealCompleted;
+    private Boolean dealFailed;
     
     // Additional Metadata
     private Map<String, Object> additionalData;

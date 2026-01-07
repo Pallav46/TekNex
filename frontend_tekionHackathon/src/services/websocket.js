@@ -182,6 +182,70 @@ class WebSocketService {
     }
   }
 
+  // Subscribe to per-deal health updates (for customer + sales views)
+  subscribeToDealHealth(dealId, onHealth) {
+    if (!this.connected || !this.stompClient) {
+      console.error('❌ WebSocket not connected');
+      return null;
+    }
+
+    const topic = `/topic/deal/${dealId}/health`;
+
+    if (this.subscriptions.has(topic)) {
+      return this.subscriptions.get(topic);
+    }
+
+    try {
+      const subscription = this.stompClient.subscribe(topic, (message) => {
+        try {
+          const deal = JSON.parse(message.body);
+          if (onHealth) onHealth(deal);
+        } catch (error) {
+          console.error('❌ Error parsing health message:', error);
+        }
+      });
+
+      this.subscriptions.set(topic, subscription);
+      console.log(`✅ Subscribed to deal health: ${topic}`);
+      return subscription;
+    } catch (error) {
+      console.error('❌ Error subscribing to deal health:', error);
+      return null;
+    }
+  }
+
+  // Subscribe to sales-executive stream of deal health updates
+  subscribeToSalesExecutiveDealHealth(salesExecutiveId, onHealth) {
+    if (!this.connected || !this.stompClient) {
+      console.error('❌ WebSocket not connected');
+      return null;
+    }
+
+    const topic = `/topic/sales-executive/${salesExecutiveId}/deal-health`;
+
+    if (this.subscriptions.has(topic)) {
+      return this.subscriptions.get(topic);
+    }
+
+    try {
+      const subscription = this.stompClient.subscribe(topic, (message) => {
+        try {
+          const deal = JSON.parse(message.body);
+          if (onHealth) onHealth(deal);
+        } catch (error) {
+          console.error('❌ Error parsing sales-exec health message:', error);
+        }
+      });
+
+      this.subscriptions.set(topic, subscription);
+      console.log(`✅ Subscribed to sales executive deal health: ${topic}`);
+      return subscription;
+    } catch (error) {
+      console.error('❌ Error subscribing to sales executive deal health:', error);
+      return null;
+    }
+  }
+
   // Unsubscribe from a deal's chat topic
   unsubscribeFromDealChat(dealId) {
     const topic = `/topic/chat/${dealId}`;

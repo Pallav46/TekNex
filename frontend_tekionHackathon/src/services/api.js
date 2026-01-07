@@ -115,6 +115,46 @@ export const dealAPI = {
   updateDeal: async (dealData) => {
     const response = await api.put('/deals/update', dealData);
     return response.data;
+  },
+
+  // Customer books an appointment
+  bookAppointment: async (dealId, payload) => {
+    const response = await api.post(`/deals/${dealId}/appointment`, payload);
+    return response.data;
+  },
+
+  // Sales executive updates deal stage
+  updateDealStage: async (dealId, status) => {
+    const response = await api.put(`/deals/${dealId}/stage`, { status });
+    return response.data;
+  },
+
+  // Deal terminal actions
+  completeDeal: async (dealId) => {
+    const response = await api.post(`/deals/${dealId}/complete`);
+    return response.data;
+  },
+
+  failDeal: async (dealId) => {
+    const response = await api.post(`/deals/${dealId}/fail`);
+    return response.data;
+  },
+
+  // Trigger health score recompute
+  requestHealthScore: async (dealId) => {
+    const response = await api.post(`/deals/${dealId}/request-health-score`);
+    return response.data;
+  },
+
+  // Feedback
+  submitFeedback: async (dealId, payload) => {
+    const response = await api.post(`/deals/${dealId}/feedback`, payload);
+    return response.data;
+  },
+
+  getFeedback: async (dealId) => {
+    const response = await api.get(`/deals/${dealId}/feedback`);
+    return response.data;
   }
 };
 

@@ -1,6 +1,7 @@
 package com.teknex.crm.controller;
 
 import com.teknex.crm.dto.BotChatRequest;
+import com.teknex.crm.dto.DealStageUpdateRequest;
 import com.teknex.crm.dto.DealUpdateRequest;
 import com.teknex.crm.model.Deal;
 import com.teknex.crm.service.DealService;
@@ -35,6 +36,49 @@ public class DealController {
     public ResponseEntity<Deal> updateDeal(@RequestBody DealUpdateRequest request) {
         Deal deal = dealService.updateDeal(request);
         return ResponseEntity.ok(deal);
+    }
+
+    // Customer books an appointment for a deal
+    @PostMapping("/{dealId}/appointment")
+    public ResponseEntity<Deal> bookAppointment(@PathVariable String dealId, @RequestBody DealUpdateRequest request) {
+        DealUpdateRequest update = DealUpdateRequest.builder()
+                .dealId(dealId)
+                .appointmentDate(request.getAppointmentDate())
+                .note(request.getNote())
+                .build();
+        return ResponseEntity.ok(dealService.updateDeal(update));
+    }
+
+    // Sales executive advances deal stage
+    @PutMapping("/{dealId}/stage")
+    public ResponseEntity<Deal> updateStage(@PathVariable String dealId, @RequestBody DealStageUpdateRequest request) {
+        DealUpdateRequest update = DealUpdateRequest.builder()
+                .dealId(dealId)
+                .status(request.getStatus())
+                .build();
+        return ResponseEntity.ok(dealService.updateDeal(update));
+    }
+
+    // Sales executive marks deal completed
+    @PostMapping("/{dealId}/complete")
+    public ResponseEntity<Deal> completeDeal(@PathVariable String dealId) {
+        DealUpdateRequest update = DealUpdateRequest.builder()
+                .dealId(dealId)
+                .status(Deal.DealStatus.CLOSED.name())
+                .note("Deal marked as completed")
+                .build();
+        return ResponseEntity.ok(dealService.updateDeal(update));
+    }
+
+    // Sales executive marks deal failed
+    @PostMapping("/{dealId}/fail")
+    public ResponseEntity<Deal> failDeal(@PathVariable String dealId) {
+        DealUpdateRequest update = DealUpdateRequest.builder()
+                .dealId(dealId)
+                .status(Deal.DealStatus.LOST.name())
+                .note("Deal marked as failed")
+                .build();
+        return ResponseEntity.ok(dealService.updateDeal(update));
     }
     
     @GetMapping("/{dealId}")

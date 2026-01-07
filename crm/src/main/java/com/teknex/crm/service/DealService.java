@@ -154,6 +154,21 @@ public class DealService {
     }
     
     private void createDealDNA(Deal deal, SalesExecutive salesExecutive) {
+        Deal.DealStatus status = deal.getStatus();
+        boolean appointmentScheduled = deal.getAppointmentDate() != null;
+        boolean testDriveCompleted = status == Deal.DealStatus.TEST_DRIVE
+            || status == Deal.DealStatus.FINANCIAL_INQUIRY
+            || status == Deal.DealStatus.PAPERWORK
+            || status == Deal.DealStatus.DELIVERY
+            || status == Deal.DealStatus.CLOSED;
+        boolean paperworkCompleted = status == Deal.DealStatus.PAPERWORK
+            || status == Deal.DealStatus.DELIVERY
+            || status == Deal.DealStatus.CLOSED;
+        boolean deliveryCompleted = status == Deal.DealStatus.DELIVERY
+            || status == Deal.DealStatus.CLOSED;
+        boolean dealCompleted = status == Deal.DealStatus.CLOSED;
+        boolean dealFailed = status == Deal.DealStatus.LOST;
+
         DealDNA dna = DealDNA.builder()
                 .dealId(deal.getId())
                 .customerId(deal.getCustomerId())
@@ -177,9 +192,18 @@ public class DealService {
                 .salesExecutiveFollowUps(0)
                 .averageResponseTime(0.0)
                 .testDriveRequested(false)
+            .testDriveCompleted(testDriveCompleted)
                 .priceNegotiated(false)
-                .financeDiscussed(false)
-                .appointmentScheduled(false)
+            .financeDiscussed(status == Deal.DealStatus.FINANCIAL_INQUIRY
+                || status == Deal.DealStatus.PAPERWORK
+                || status == Deal.DealStatus.DELIVERY
+                || status == Deal.DealStatus.CLOSED)
+            .appointmentScheduled(appointmentScheduled)
+            .currentStage(status != null ? status.name() : null)
+            .paperworkCompleted(paperworkCompleted)
+            .deliveryCompleted(deliveryCompleted)
+            .dealCompleted(dealCompleted)
+            .dealFailed(dealFailed)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -190,9 +214,15 @@ public class DealService {
     public Deal updateDeal(DealUpdateRequest request) {
         Deal deal = dealRepository.findById(request.getDealId())
                 .orElseThrow(() -> new RuntimeException("Deal not found"));
+
+        Deal.DealStatus previousStatus = deal.getStatus();
+        boolean healthShouldRecompute = false;
         
         if (request.getStatus() != null) {
             deal.setStatus(Deal.DealStatus.valueOf(request.getStatus()));
+            if (previousStatus != deal.getStatus()) {
+                healthShouldRecompute = true;
+            }
         }
         
         if (request.getHealthScore() != null) {
@@ -210,6 +240,7 @@ public class DealService {
         if (request.getAppointmentDate() != null) {
             deal.setAppointmentDate(request.getAppointmentDate());
             deal.setStatus(Deal.DealStatus.APPOINTMENT_SCHEDULED);
+            healthShouldRecompute = true;
         }
         
         if (request.getNote() != null) {
@@ -226,6 +257,11 @@ public class DealService {
         
         // Update Deal DNA
         updateDealDNA(deal);
+
+        // Recompute DNA health score on stage milestones
+        if (healthShouldRecompute) {
+            requestHealthScore(deal.getId());
+        }
         
         log.info("Deal updated: {}", deal.getId());
         return deal;
@@ -238,6 +274,30 @@ public class DealService {
             dna.setOpportunityThreshold(deal.getOpportunityThreshold());
             dna.setTestDriveRequested(deal.getTestDriveOffered());
             dna.setAppointmentScheduled(deal.getAppointmentDate() != null);
+
+            Deal.DealStatus status = deal.getStatus();
+            dna.setCurrentStage(status != null ? status.name() : null);
+
+            boolean testDriveCompleted = status == Deal.DealStatus.TEST_DRIVE
+                || status == Deal.DealStatus.FINANCIAL_INQUIRY
+                || status == Deal.DealStatus.PAPERWORK
+                || status == Deal.DealStatus.DELIVERY
+                || status == Deal.DealStatus.CLOSED;
+            boolean paperworkCompleted = status == Deal.DealStatus.PAPERWORK
+                || status == Deal.DealStatus.DELIVERY
+                || status == Deal.DealStatus.CLOSED;
+            boolean deliveryCompleted = status == Deal.DealStatus.DELIVERY
+                || status == Deal.DealStatus.CLOSED;
+            dna.setTestDriveCompleted(testDriveCompleted);
+            dna.setFinanceDiscussed(status == Deal.DealStatus.FINANCIAL_INQUIRY
+                || status == Deal.DealStatus.PAPERWORK
+                || status == Deal.DealStatus.DELIVERY
+                || status == Deal.DealStatus.CLOSED);
+            dna.setPaperworkCompleted(paperworkCompleted);
+            dna.setDeliveryCompleted(deliveryCompleted);
+            dna.setDealCompleted(status == Deal.DealStatus.CLOSED);
+            dna.setDealFailed(status == Deal.DealStatus.LOST);
+
             dna.setUpdatedAt(LocalDateTime.now());
             dealDNARepository.save(dna);
         });
@@ -262,6 +322,15 @@ public class DealService {
         
         dealRepository.save(deal);
         updateDealDNA(deal);
+
+        // Broadcast health updates to both customer and sales executive UIs
+        messagingTemplate.convertAndSend("/topic/deal/" + dealId + "/health", deal);
+        if (deal.getSalesExecutiveId() != null) {
+            messagingTemplate.convertAndSend(
+                    "/topic/sales-executive/" + deal.getSalesExecutiveId() + "/deal-health",
+                    deal
+            );
+        }
     }
     
     public List<Deal> getDealsByCustomer(Long customerId) {
@@ -282,11 +351,32 @@ public class DealService {
                 .orElseThrow(() -> new RuntimeException("Deal not found"));
         
         dealDNARepository.findByDealId(dealId).ifPresent(dna -> {
+            Deal.DealStatus status = deal.getStatus();
+            boolean appointmentScheduled = deal.getAppointmentDate() != null;
+
             HealthScoreRequest request = HealthScoreRequest.builder()
                     .dealId(dealId)
                     .dealDnaId(dna.getId())
+                    .status(status != null ? status.name() : null)
+                    .appointmentScheduled(appointmentScheduled)
+                    .testDriveRequested(Boolean.TRUE.equals(dna.getTestDriveRequested()))
+                    .testDriveCompleted(Boolean.TRUE.equals(dna.getTestDriveCompleted()))
+                    .financeDiscussed(Boolean.TRUE.equals(dna.getFinanceDiscussed()))
+                    .paperworkCompleted(Boolean.TRUE.equals(dna.getPaperworkCompleted()))
+                    .deliveryCompleted(Boolean.TRUE.equals(dna.getDeliveryCompleted()))
+                    .dealCompleted(Boolean.TRUE.equals(dna.getDealCompleted()))
+                    .dealFailed(Boolean.TRUE.equals(dna.getDealFailed()))
+                    .interestCategory(deal.getInterestCategory())
+                    .budgetRange(deal.getBudgetRange())
+                    .intendedTimeframe(deal.getIntendedTimeframe())
+                    .preferredContactMode(deal.getPreferredContactMode())
+                    .salesExecutivePerformanceScore(dna.getSalesExecutivePerformanceScore())
+                    .totalInteractions(dna.getTotalInteractions())
+                    .customerResponses(dna.getCustomerResponses())
+                    .salesExecutiveFollowUps(dna.getSalesExecutiveFollowUps())
+                    .averageResponseTime(dna.getAverageResponseTime())
                     .build();
-            
+
             kafkaProducerService.sendHealthScoreRequest(request);
             log.info("Health score request sent for deal: {}", dealId);
         });

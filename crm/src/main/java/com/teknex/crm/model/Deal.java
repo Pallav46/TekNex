@@ -35,7 +35,8 @@ public class Deal {
     private String intendedTimeframe; // e.g., "1-2 months", "6+ months"
     private String preferredContactMode; // phone, call, skype, whatsapp
     
-    private DealStatus status; // INITIATED, IN_PROGRESS, APPOINTMENT_SCHEDULED, CLOSED, LOST
+    // Deal lifecycle stage
+    private DealStatus status; // INITIATED -> ... -> CLOSED/LOST
     
     private Double healthScore = 50.0; // 0-100
     private Double criticalThreshold = 30.0; // Low threshold - deal unlikely
@@ -52,6 +53,14 @@ public class Deal {
     private LocalDateTime lastContactedAt;
     
     public enum DealStatus {
-        INITIATED, IN_PROGRESS, APPOINTMENT_SCHEDULED, CLOSED, LOST
+        INITIATED,
+        IN_PROGRESS,
+        APPOINTMENT_SCHEDULED,
+        TEST_DRIVE,
+        FINANCIAL_INQUIRY,
+        PAPERWORK,
+        DELIVERY,
+        CLOSED,
+        LOST
     }
 }

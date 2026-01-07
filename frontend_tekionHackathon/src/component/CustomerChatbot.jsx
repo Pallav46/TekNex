@@ -91,11 +91,15 @@ const TypingIndicator = () => (
 // Status badge component
 const StatusBadge = ({ status }) => {
   const statusConfig = {
-    NEW: { color: 'bg-blue-500', text: 'New' },
+    INITIATED: { color: 'bg-blue-500', text: 'Initiated' },
     IN_PROGRESS: { color: 'bg-yellow-500', text: 'In Progress' },
-    NEGOTIATION: { color: 'bg-purple-500', text: 'Negotiation' },
-    CLOSED_WON: { color: 'bg-green-500', text: 'Won' },
-    CLOSED_LOST: { color: 'bg-red-500', text: 'Lost' },
+    APPOINTMENT_SCHEDULED: { color: 'bg-purple-500', text: 'Appointment' },
+    TEST_DRIVE: { color: 'bg-indigo-500', text: 'Test Drive' },
+    FINANCIAL_INQUIRY: { color: 'bg-amber-500', text: 'Finance' },
+    PAPERWORK: { color: 'bg-slate-500', text: 'Paperwork' },
+    DELIVERY: { color: 'bg-cyan-500', text: 'Delivery' },
+    CLOSED: { color: 'bg-green-500', text: 'Closed' },
+    LOST: { color: 'bg-red-500', text: 'Lost' },
   };
   const config = statusConfig[status] || { color: 'bg-gray-500', text: status };
   return (
@@ -115,9 +119,14 @@ export default function CustomerChatbot() {
   const [chatInputValue, setChatInputValue] = useState('');
   const [dealId, setDealId] = useState(null);
   const [dealData, setDealData] = useState({});
+  const [currentDealInfo, setCurrentDealInfo] = useState(null);
+  const [appointmentDateInput, setAppointmentDateInput] = useState('');
+  const [bookingAppointment, setBookingAppointment] = useState(false);
+  const [showHomeTestDrivePopup, setShowHomeTestDrivePopup] = useState(false);
   const [salesPersonJoined, setSalesPersonJoined] = useState(false);
   const [isChatMode, setIsChatMode] = useState(false);
   const assignmentNotifiedRef = useRef(false); // Track if assignment notification was already shown
+  const homeTestDrivePopupShownForDealsRef = useRef(new Set());
   
   // Past deals state
   const [pastDeals, setPastDeals] = useState([]);
@@ -166,6 +175,7 @@ export default function CustomerChatbot() {
 
   const openDealChat = async (deal) => {
     setSelectedPastDeal(deal);
+    setCurrentDealInfo(deal);
     setActiveView('dealChat');
     setDealId(deal.id);
     
@@ -207,13 +217,58 @@ export default function CustomerChatbot() {
       if (deal.salesExecutiveId) {
         setSalesPersonJoined(true);
         setIsChatMode(true);
-        
-        // Always reconnect WebSocket to ensure fresh subscription for this deal
-        connectWebSocketForDeal(deal.id);
+      }
+
+      // Always reconnect WebSocket to ensure fresh subscriptions (chat + health)
+      connectWebSocketForDeal(deal.id);
+
+      // Fetch freshest deal snapshot (health score, appointment, etc.)
+      try {
+        const latestDeal = await dealAPI.getDeal(deal.id);
+        setSelectedPastDeal(latestDeal);
+        setCurrentDealInfo(latestDeal);
+      } catch (e) {
+        console.log('Could not refresh deal snapshot:', e);
       }
     } catch (error) {
       console.error('Error fetching chat history:', error);
       setPastDealMessages([]);
+    }
+  };
+
+  const handleDealHealthUpdate = (updatedDeal) => {
+    if (!updatedDeal?.id) return;
+
+    // Keep “My Deals” list fresh
+    setPastDeals(prev => (prev || []).map(d => (d?.id === updatedDeal.id ? { ...d, ...updatedDeal } : d)));
+
+    // Current deal snapshots
+    setCurrentDealInfo(prev => (prev?.id === updatedDeal.id ? { ...prev, ...updatedDeal } : prev));
+    setSelectedPastDeal(prev => (prev?.id === updatedDeal.id ? { ...prev, ...updatedDeal } : prev));
+
+    // One-time popup when home test drive becomes available
+    if (updatedDeal.homeTestDriveOffered && !homeTestDrivePopupShownForDealsRef.current.has(updatedDeal.id)) {
+      homeTestDrivePopupShownForDealsRef.current.add(updatedDeal.id);
+      setShowHomeTestDrivePopup(true);
+    }
+  };
+
+  const submitAppointment = async () => {
+    const targetDealId = activeView === 'dealChat' ? selectedPastDeal?.id : dealId;
+    if (!targetDealId || !appointmentDateInput) return;
+
+    try {
+      setBookingAppointment(true);
+      const updated = await dealAPI.bookAppointment(targetDealId, {
+        appointmentDate: appointmentDateInput,
+        note: 'Appointment booked by customer'
+      });
+      handleDealHealthUpdate(updated);
+      setAppointmentDateInput('');
+    } catch (e) {
+      console.error('Failed to book appointment:', e);
+    } finally {
+      setBookingAppointment(false);
     }
   };
 
@@ -256,6 +311,11 @@ export default function CustomerChatbot() {
           });
           
           console.log('Subscribed to /topic/chat/' + dealIdToConnect);
+
+          // Subscribe to live health updates for this deal
+          webSocketService.subscribeToDealHealth(dealIdToConnect, (deal) => {
+            handleDealHealthUpdate(deal);
+          });
         },
         (error) => {
           console.error('WebSocket connection error:', error);
@@ -396,6 +456,11 @@ export default function CustomerChatbot() {
           });
           
           webSocketService.subscribeToDealChat(dealId, handleIncomingMessage);
+
+          // Subscribe to deal health updates
+          webSocketService.subscribeToDealHealth(dealId, (deal) => {
+            handleDealHealthUpdate(deal);
+          });
           
           // Poll for deal assignment as backup
           let pollCount = 0;
@@ -486,6 +551,7 @@ export default function CustomerChatbot() {
     setMessages([]);
     setDealId(null);
     setDealData({});
+    setCurrentDealInfo(null);
     setSalesPersonJoined(false);
     setIsChatMode(false);
     setCurrentStepId('intro');
@@ -578,6 +644,7 @@ export default function CustomerChatbot() {
 
       const createdDeal = await dealAPI.initiateDeal(dealPayload);
       setDealId(createdDeal.id);
+      setCurrentDealInfo(createdDeal);
       
       setTimeout(() => {
         setIsTyping(false);
@@ -625,16 +692,15 @@ export default function CustomerChatbot() {
   };
 
   const goBack = () => {
-    if (activeView === 'dealChat') {
-      setSelectedPastDeal(null);
-      setPastDealMessages([]);
-      if (dealId) {
-        webSocketService.unsubscribeFromDealChat(dealId);
-      }
-      setDealId(null);
-      setSalesPersonJoined(false);
-      setIsChatMode(false);
+    if (webSocketService.isConnected()) {
+      webSocketService.disconnect();
     }
+    setSelectedPastDeal(null);
+    setPastDealMessages([]);
+    setDealId(null);
+    setCurrentDealInfo(null);
+    setSalesPersonJoined(false);
+    setIsChatMode(false);
     setActiveView('menu');
   };
 
@@ -761,6 +827,41 @@ export default function CustomerChatbot() {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#0f1115] rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[#2a2f38] flex flex-col h-[80vh] overflow-hidden relative animate-in fade-in zoom-in-95 duration-300">
+
+        {showHomeTestDrivePopup && (
+          <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
+            <div className="w-full bg-[#181b21] border border-[#2a2f38] rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#00D9FF]/20 flex items-center justify-center">
+                    <Sparkles className="text-[#00D9FF]" size={22} />
+                  </div>
+                  <div>
+                    <div className="text-white font-bold text-sm">Congratulations!</div>
+                    <div className="text-gray-300 text-sm">You won a free home test drive.</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowHomeTestDrivePopup(false)}
+                  className="p-2 hover:bg-[#2a2f38] text-gray-400 hover:text-white rounded-full transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="mt-4 text-xs text-gray-400">
+                Your specialist can schedule it at your convenience.
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowHomeTestDrivePopup(false)}
+                  className="w-full py-2.5 bg-[#00D9FF] text-black rounded-xl font-semibold hover:opacity-90"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Header */}
         <div className="p-4 border-b border-[#2a2f38] flex items-center justify-between bg-[#181b21]">
@@ -785,6 +886,14 @@ export default function CustomerChatbot() {
               <p className="text-[#00D9FF] text-xs font-medium">
                 {activeView === 'menu' ? 'Welcome back!' : 'Online • Instantly replies'}
               </p>
+              {(activeView === 'dealChat' || activeView === 'newDeal') && (currentDealInfo?.id || dealId) && (
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] text-gray-400">
+                    Health: {Math.round((currentDealInfo?.healthScore ?? 50) * 10) / 10}/100
+                  </span>
+                  {currentDealInfo?.status && <StatusBadge status={currentDealInfo.status} />}
+                </div>
+              )}
             </div>
           </div>
           <button 
@@ -896,6 +1005,42 @@ export default function CustomerChatbot() {
             {renderMessages(messages)}
             
             <div className="p-4 bg-[#181b21] border-t border-[#2a2f38]">
+              {dealId && !currentDealInfo?.appointmentDate && (
+                <div className="mb-3 p-3 bg-[#0f1115] border border-[#2a2f38] rounded-xl">
+                  <div className="flex items-center gap-2 text-xs text-gray-300 mb-2">
+                    <Calendar size={14} className="text-[#00D9FF]" />
+                    <span className="font-semibold">Book an appointment</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="datetime-local"
+                      value={appointmentDateInput}
+                      onChange={(e) => setAppointmentDateInput(e.target.value)}
+                      className="flex-1 bg-[#181b21] border border-[#2a2f38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00D9FF] focus:ring-1 focus:ring-[#00D9FF]"
+                    />
+                    <button
+                      type="button"
+                      onClick={submitAppointment}
+                      disabled={!appointmentDateInput || bookingAppointment}
+                      className="px-3 py-2 bg-[#00D9FF] text-black rounded-xl text-xs font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bookingAppointment ? '...' : 'Book'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {dealId && currentDealInfo?.appointmentDate && (
+                <div className="mb-3 p-3 bg-[#0f1115] border border-[#2a2f38] rounded-xl">
+                  <div className="flex items-center gap-2 text-xs text-gray-300">
+                    <Calendar size={14} className="text-[#00D9FF]" />
+                    <span>
+                      Appointment: {new Date(currentDealInfo.appointmentDate).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {isChatMode ? (
                 <form onSubmit={sendChatMessage} className="flex gap-2">
                   <input 
@@ -941,6 +1086,51 @@ export default function CustomerChatbot() {
             {renderMessages(pastDealMessages)}
             
             <div className="p-4 bg-[#181b21] border-t border-[#2a2f38]">
+              {!selectedPastDeal.appointmentDate && selectedPastDeal.status !== 'CLOSED' && selectedPastDeal.status !== 'LOST' && (
+                <div className="mb-3 p-3 bg-[#0f1115] border border-[#2a2f38] rounded-xl">
+                  <div className="flex items-center gap-2 text-xs text-gray-300 mb-2">
+                    <Calendar size={14} className="text-[#00D9FF]" />
+                    <span className="font-semibold">Book an appointment</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="datetime-local"
+                      value={appointmentDateInput}
+                      onChange={(e) => setAppointmentDateInput(e.target.value)}
+                      className="flex-1 bg-[#181b21] border border-[#2a2f38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00D9FF] focus:ring-1 focus:ring-[#00D9FF]"
+                    />
+                    <button
+                      type="button"
+                      onClick={submitAppointment}
+                      disabled={!appointmentDateInput || bookingAppointment}
+                      className="px-3 py-2 bg-[#00D9FF] text-black rounded-xl text-xs font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bookingAppointment ? '...' : 'Book'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {selectedPastDeal.appointmentDate && (
+                <div className="mb-3 p-3 bg-[#0f1115] border border-[#2a2f38] rounded-xl">
+                  <div className="flex items-center gap-2 text-xs text-gray-300">
+                    <Calendar size={14} className="text-[#00D9FF]" />
+                    <span>
+                      Appointment: {new Date(selectedPastDeal.appointmentDate).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {selectedPastDeal.homeTestDriveOffered && (
+                <div className="mb-3 p-3 bg-[#00D9FF]/10 border border-[#00D9FF]/30 rounded-xl">
+                  <div className="flex items-center gap-2 text-xs text-[#00D9FF] font-semibold">
+                    <Sparkles size={14} />
+                    Free home test drive available for you
+                  </div>
+                </div>
+              )}
+
               {selectedPastDeal.salesExecutiveId ? (
                 <form onSubmit={sendPastDealMessage} className="flex gap-2">
                   <input 

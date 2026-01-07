@@ -125,12 +125,11 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
         
-        String userType = request.getUserType() != null ? request.getUserType() : "customer";
-        
-        if ("sales_executive".equals(userType)) {
-            SalesExecutive salesExecutive = salesExecutiveRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new RuntimeException("Sales Executive not found"));
-            
+        // Auto-detect user type by checking both tables
+        // First check sales_executives table
+        var salesExecOpt = salesExecutiveRepository.findByEmail(request.getEmail());
+        if (salesExecOpt.isPresent()) {
+            SalesExecutive salesExecutive = salesExecOpt.get();
             String token = jwtService.generateToken(salesExecutive.getEmail(), salesExecutive.getId(), "sales_executive");
             
             return AuthResponse.builder()
@@ -141,20 +140,21 @@ public class AuthService {
                     .email(salesExecutive.getEmail())
                     .userType("sales_executive")
                     .build();
-        } else {
-            Customer customer = customerRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new RuntimeException("Customer not found"));
-            
-            String token = jwtService.generateToken(customer.getEmail(), customer.getId(), "customer");
-            
-            return AuthResponse.builder()
-                    .token(token)
-                    .type("Bearer")
-                    .id(customer.getId())
-                    .name(customer.getName())
-                    .email(customer.getEmail())
-                    .userType("customer")
-                    .build();
         }
+        
+        // Otherwise check customers table
+        Customer customer = customerRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+        
+        String token = jwtService.generateToken(customer.getEmail(), customer.getId(), "customer");
+        
+        return AuthResponse.builder()
+                .token(token)
+                .type("Bearer")
+                .id(customer.getId())
+                .name(customer.getName())
+                .email(customer.getEmail())
+                .userType("customer")
+                .build();
     }
 }

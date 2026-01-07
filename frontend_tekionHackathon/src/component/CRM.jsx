@@ -135,16 +135,26 @@ const CircularProgress = ({ value, size = 60, strokeWidth = 5, color = COLORS.pr
 const StatusBadge = ({ stage }) => {
   const styles = {
     lead: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    appointment: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
+    test_drive: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
     negotiation: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
     demo: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    finance: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
+    paperwork: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
+    delivery: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20',
     closed: 'bg-green-500/10 text-green-400 border-green-500/20',
     lost: 'bg-red-500/10 text-red-400 border-red-500/20',
   };
 
   const labels = {
     lead: 'Target Lead',
+    appointment: 'Appointment Scheduled',
+    test_drive: 'Test Drive',
     negotiation: 'Negotiation',
     demo: 'Demo Drive',
+    finance: 'Financial Inquiry',
+    paperwork: 'Paperwork',
+    delivery: 'Delivery',
     closed: 'Deal Closed',
     lost: 'Lost Deal'
   };
@@ -346,6 +356,14 @@ const CustomerDetailPanel = ({ customer, onClose, onAction }) => {
               <span className="text-gray-400 text-sm">Stage</span>
               <StatusBadge stage={customer.stage} />
             </div>
+            {customer.dealData?.appointmentDate && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm">Appointment</span>
+                <span className="text-white text-sm font-medium">
+                  {new Date(customer.dealData.appointmentDate).toLocaleString()}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-sm">Budget</span>
               <span className="text-white text-sm font-medium">{customer.price}</span>
@@ -353,46 +371,82 @@ const CustomerDetailPanel = ({ customer, onClose, onAction }) => {
             <div className="pt-2">
               <InteractiveBar value={customer.health} label="Win Probability" />
             </div>
+            {customer.dealData?.homeTestDriveOffered && (
+              <div className="text-xs text-[#00D9FF] border border-[#00D9FF]/20 bg-[#00D9FF]/10 rounded-lg px-3 py-2">
+                Customer eligible: free home test drive
+              </div>
+            )}
           </div>
         </div>
 
         <div>
           <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Recent Activity</h4>
           <div className="space-y-4">
-             {/* Mock Timeline */}
-             <div className="flex gap-3 relative pb-4">
-               <div className="absolute left-[15px] top-8 bottom-0 w-0.5 bg-[#2a2f38]" />
-               <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 z-10">
-                 <MessageCircle size={14} className="text-blue-400" />
-               </div>
-               <div>
-                 <p className="text-white text-sm font-medium">Incoming Message</p>
-                 <p className="text-gray-500 text-xs mt-0.5">"Is the price negotiable?"</p>
-                 <p className="text-gray-600 text-[10px] mt-1">Today, 2:30 PM</p>
-               </div>
-             </div>
-             
-             <div className="flex gap-3 relative">
-               <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0 z-10">
-                 <User size={14} className="text-purple-400" />
-               </div>
-               <div>
-                 <p className="text-white text-sm font-medium">Lead Assigned</p>
-                 <p className="text-gray-500 text-xs mt-0.5">Assigned to Sarah Johnson</p>
-                 <p className="text-gray-600 text-[10px] mt-1">Yesterday, 9:00 AM</p>
-               </div>
+             {/* Activity feed will be populated from real backend events */}
+             <div className="text-center py-6 text-gray-600 text-sm">
+               No recent activity
              </div>
           </div>
         </div>
         
-        {customer.stage === 'lost' && (
+        {(customer.stage === 'lost' || customer.stage === 'closed') && (
           <div className="mt-8">
             <button 
               onClick={() => onAction('loss_analysis', customer)}
-              className="w-full py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all font-medium text-sm"
+              className={`w-full py-3 rounded-xl transition-all font-medium text-sm ${
+                customer.stage === 'closed'
+                  ? 'bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500 hover:text-white'
+                  : 'bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white'
+              }`}
             >
-              View Loss Analysis
+              Give Feedback
             </button>
+          </div>
+        )}
+
+        {customer.stage !== 'lost' && customer.stage !== 'closed' && (
+          <div className="mt-2 space-y-2">
+            <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Stage Actions</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onAction('stage', { customer, status: 'TEST_DRIVE' })}
+                className="py-2 rounded-xl bg-[#2a2f38]/50 hover:bg-[#2a2f38] border border-[#2a2f38] text-gray-200 text-xs"
+              >
+                Test Drive
+              </button>
+              <button
+                onClick={() => onAction('stage', { customer, status: 'FINANCIAL_INQUIRY' })}
+                className="py-2 rounded-xl bg-[#2a2f38]/50 hover:bg-[#2a2f38] border border-[#2a2f38] text-gray-200 text-xs"
+              >
+                Finance
+              </button>
+              <button
+                onClick={() => onAction('stage', { customer, status: 'PAPERWORK' })}
+                className="py-2 rounded-xl bg-[#2a2f38]/50 hover:bg-[#2a2f38] border border-[#2a2f38] text-gray-200 text-xs"
+              >
+                Paperwork
+              </button>
+              <button
+                onClick={() => onAction('stage', { customer, status: 'DELIVERY' })}
+                className="py-2 rounded-xl bg-[#2a2f38]/50 hover:bg-[#2a2f38] border border-[#2a2f38] text-gray-200 text-xs"
+              >
+                Delivery
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onAction('complete', customer)}
+                className="py-2 rounded-xl bg-green-500/10 hover:bg-green-500 border border-green-500/20 text-green-400 hover:text-white text-xs"
+              >
+                Complete
+              </button>
+              <button
+                onClick={() => onAction('fail', customer)}
+                className="py-2 rounded-xl bg-red-500/10 hover:bg-red-500 border border-red-500/20 text-red-400 hover:text-white text-xs"
+              >
+                Fail
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -920,8 +974,8 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
                   name: newDeal.customerName || newDeal.customer?.name || 'New Customer',
                   model: newDeal.interestCategory || 'Vehicle',
                   price: newDeal.budgetRange || 'N/A',
-                  health: 70,
-                  stage: 'lead',
+                  health: calculateDealHealth(newDeal),
+                  stage: mapDealStatus(newDeal.status),
                   salesperson: currentUser?.name || 'You',
                   avatar: `https://i.pravatar.cc/150?u=${newDeal.customerId || newDeal.id}`,
                   messages: [],
@@ -942,6 +996,11 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
                 console.error('Error parsing new customer notification:', error);
               }
             });
+
+          // Subscribe to deal health updates for this sales executive
+          webSocketService.subscribeToSalesExecutiveDealHealth(salesExecutiveId, (updatedDeal) => {
+            handleDealHealthUpdate(updatedDeal);
+          });
         },
         (error) => {
           console.error('WebSocket connection error:', error);
@@ -988,6 +1047,31 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
     ));
   };
 
+  const handleDealHealthUpdate = (updatedDeal) => {
+    if (!updatedDeal?.id) return;
+
+    setDeals(prev => prev.map(d => {
+      if (d.id !== updatedDeal.id) return d;
+      return {
+        ...d,
+        health: calculateDealHealth(updatedDeal),
+        stage: mapDealStatus(updatedDeal.status),
+        lastContact: formatLastContact(updatedDeal.updatedAt),
+        dealData: updatedDeal
+      };
+    }));
+
+    const currentActive = activeChatDealRef.current;
+    if (currentActive?.id === updatedDeal.id) {
+      setActiveChatDeal(prev => prev ? ({
+        ...prev,
+        health: calculateDealHealth(updatedDeal),
+        stage: mapDealStatus(updatedDeal.status),
+        dealData: updatedDeal
+      }) : prev);
+    }
+  };
+
   const fetchDeals = async () => {
     try {
       setLoading(true);
@@ -1028,17 +1112,25 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
   };
 
   const calculateDealHealth = (deal) => {
-    // Simple algorithm to calculate deal health
-    if (deal.status === 'CLOSED' || deal.status === 'CONVERTED') return 95;
-    if (deal.status === 'LOST') return 10;
-    if (deal.status === 'ACTIVE') return 70;
+    const hs = deal?.healthScore;
+    if (typeof hs === 'number' && !Number.isNaN(hs)) {
+      return Math.max(0, Math.min(100, Math.round(hs)));
+    }
+    if (deal?.status === 'CLOSED' || deal?.status === 'CONVERTED') return 95;
+    if (deal?.status === 'LOST') return 10;
     return 50;
   };
 
   const mapDealStatus = (status) => {
     const statusMap = {
       'ACTIVE': 'lead',
+      'INITIATED': 'lead',
       'IN_PROGRESS': 'negotiation',
+      'APPOINTMENT_SCHEDULED': 'appointment',
+      'TEST_DRIVE': 'test_drive',
+      'FINANCIAL_INQUIRY': 'finance',
+      'PAPERWORK': 'paperwork',
+      'DELIVERY': 'delivery',
       'CLOSED': 'closed',
       'CONVERTED': 'closed',
       'LOST': 'lost'
@@ -1150,6 +1242,31 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
       openChat(customer);
     } else if (action === 'loss_analysis' && onNavigate) {
       onNavigate('feedback', customer);
+    } else if (action === 'stage') {
+      const { customer: c, status } = customer;
+      const dealId = c?.id;
+      if (!dealId || !status) return;
+      dealAPI.updateDealStage(dealId, status)
+        .then((updated) => handleDealHealthUpdate(updated))
+        .catch((e) => console.error('Failed to update stage:', e));
+    } else if (action === 'complete') {
+      const dealId = customer?.id;
+      if (!dealId) return;
+      dealAPI.completeDeal(dealId)
+        .then((updated) => {
+          handleDealHealthUpdate(updated);
+          if (onNavigate) onNavigate('feedback', { ...customer, dealData: updated });
+        })
+        .catch((e) => console.error('Failed to complete deal:', e));
+    } else if (action === 'fail') {
+      const dealId = customer?.id;
+      if (!dealId) return;
+      dealAPI.failDeal(dealId)
+        .then((updated) => {
+          handleDealHealthUpdate(updated);
+          if (onNavigate) onNavigate('feedback', { ...customer, dealData: updated });
+        })
+        .catch((e) => console.error('Failed to fail deal:', e));
     }
   };
 
