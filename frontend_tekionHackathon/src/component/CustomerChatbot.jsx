@@ -169,6 +169,12 @@ export default function CustomerChatbot() {
     setActiveView('dealChat');
     setDealId(deal.id);
     
+    // Clear polling interval from previous deal if any
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
     // Load chat history for this deal
     try {
       const chats = await chatAPI.getDealChats(deal.id);
@@ -308,7 +314,11 @@ export default function CustomerChatbot() {
 
   // Initialize WebSocket when deal is created (for new deals)
   useEffect(() => {
-    if (dealId && activeView === 'newDeal' && !webSocketService.isConnected()) {
+    if (dealId && activeView === 'newDeal') {
+      // Always disconnect previous connection to get fresh subscriptions
+      if (webSocketService.isConnected()) {
+        webSocketService.disconnect();
+      }
       initializeWebSocket();
     }
 
@@ -463,6 +473,15 @@ export default function CustomerChatbot() {
   };
 
   const startNewDeal = () => {
+    // Clean up previous WebSocket connection and polling
+    if (webSocketService.isConnected()) {
+      webSocketService.disconnect();
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
     setActiveView('newDeal');
     setMessages([]);
     setDealId(null);
@@ -471,6 +490,8 @@ export default function CustomerChatbot() {
     setIsChatMode(false);
     setCurrentStepId('intro');
     assignmentNotifiedRef.current = false; // Reset for new deal
+    setPastDealMessages([]); // Clear past deal messages
+    setSelectedPastDeal(null); // Clear selected past deal
     
     setTimeout(() => {
       addSystemMessage('intro');

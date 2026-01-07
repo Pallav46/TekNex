@@ -859,9 +859,9 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
     }
   }, []); // Empty dependency - run only once on mount
 
-  // Initialize WebSocket for real-time updates
+  // Initialize WebSocket immediately upon mount (don't wait for deals)
   useEffect(() => {
-    if (deals.length > 0 && !webSocketService.isConnected() && !wsInitialized.current) {
+    if (currentUser?.id && !wsInitialized.current) {
       wsInitialized.current = true;
       initializeWebSocket();
     }
@@ -871,8 +871,21 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
       deals.forEach(deal => {
         webSocketService.unsubscribeFromDealChat(deal.id);
       });
+      // Disconnect WebSocket
+      webSocketService.disconnect();
     };
-  }, [deals.length]); // Only depend on length, not the entire array
+  }, []); // Empty dependency - run only once on mount
+
+  // Subscribe to new deals' chats when deals are loaded or updated
+  useEffect(() => {
+    if (webSocketService.isConnected() && deals.length > 0) {
+      deals.forEach(deal => {
+        if (deal.id && !webSocketService.subscriptions.has(`/topic/chat/${deal.id}`)) {
+          webSocketService.subscribeToDealChat(deal.id, handleIncomingMessage);
+        }
+      });
+    }
+  }, [deals.length]); // Subscribe when deals change
 
   const initializeWebSocket = async () => {
     try {
@@ -880,9 +893,14 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
         (frame) => {
           console.log('Sales dashboard WebSocket connected');
           
-          // Subscribe to new customer notifications for sales executive ID=1 (demo)
-          // ML service always assigns to Rajesh Kumar (ID=1)
-          const salesExecutiveId = 1;
+          // Subscribe to new customer notifications for the logged-in sales executive
+          const salesExecutiveId = currentUser?.id;
+          if (!salesExecutiveId) {
+            console.warn('No sales executive ID available for WebSocket subscription');
+            return;
+          }
+          
+          console.log(`Subscribing to new customer notifications for SE ID: ${salesExecutiveId}`);
           webSocketService.stompClient.subscribe(`/topic/sales-executive/${salesExecutiveId}/new-customer`, (message) => {
               try {
                 const newDeal = JSON.parse(message.body);
@@ -924,13 +942,6 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
                 console.error('Error parsing new customer notification:', error);
               }
             });
-          
-          // Subscribe to all active deals
-          deals.forEach(deal => {
-            if (deal.status === 'active' || deal.status === 'ACTIVE') {
-              webSocketService.subscribeToDealChat(deal.id, handleIncomingMessage);
-            }
-          });
         },
         (error) => {
           console.error('WebSocket connection error:', error);
