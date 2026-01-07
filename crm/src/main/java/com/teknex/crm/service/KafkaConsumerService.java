@@ -30,22 +30,27 @@ public class KafkaConsumerService {
             
             // Parse the response
             Map<String, Object> responseMap = objectMapper.readValue(message, Map.class);
-            
+
             String dealId = (String) responseMap.get("dealId");
-            Long salesExecutiveId = ((Number) responseMap.get("salesExecutiveId")).longValue();
-            
+            Object seObj = responseMap.get("salesExecutiveId");
+            if (seObj == null) {
+                seObj = responseMap.get("SalesExecutiveID");
+            }
+
+            Long salesExecutiveId;
+            if (seObj instanceof Number) {
+                salesExecutiveId = ((Number) seObj).longValue();
+            } else if (seObj instanceof String) {
+                salesExecutiveId = Long.parseLong((String) seObj);
+            } else {
+                throw new IllegalArgumentException("Missing/invalid salesExecutiveId in match response");
+            }
+
+            if (dealId == null || dealId.isBlank()) {
+                throw new IllegalArgumentException("Missing dealId in match response");
+            }
+
             log.info("Parsed - Deal ID: {}, Sales Executive ID: {}", dealId, salesExecutiveId);
-            
-            SalesExecutiveMatchResponse response = SalesExecutiveMatchResponse.builder()
-                    .dealId(dealId)
-                    .salesExecutiveId(salesExecutiveId)
-                    .salesExecutiveName((String) responseMap.get("salesExecutiveName"))
-                    .salesExecutiveEmail((String) responseMap.get("salesExecutiveEmail"))
-                    .dealerId(((Number) responseMap.get("dealerId")).longValue())
-                    .dealerName((String) responseMap.get("dealerName"))
-                    .message((String) responseMap.get("message"))
-                    .build();
-            
             log.info("Processed match response - Assigning SE {} to deal {}", salesExecutiveId, dealId);
             
             // Assign sales executive to the deal

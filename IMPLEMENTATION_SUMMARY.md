@@ -71,7 +71,7 @@
 
 ### 3. ML Services (Flask)
 
-#### **Sales Executive Predictor** (`pridict-sales-executive`)
+#### **Sales Executive Predictor** (`predict-sales-executive`)
 - ✅ Flask app on port 5001
 - ✅ Kafka consumer for match requests
 - ✅ ML simulation with expertise matching

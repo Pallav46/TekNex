@@ -13,7 +13,7 @@ A comprehensive Customer Relationship Management (CRM) system for automotive dea
 - **Docker & Docker Compose** - Containerized deployment
 
 ### ML Services (Flask)
-1. **Sales Executive Predictor** (`pridict-sales-executive`) - Matches customers with best-suited sales executives
+1. **Sales Executive Predictor** (`predict-sales-executive`) - Matches customers with best-suited sales executives
 2. **Deal DNA Analyzer** (`dna`) - Calculates deal health scores and thresholds
 
 ## 📊 Key Features
@@ -285,7 +285,7 @@ cd crm
 docker build -t crm-backend .
 
 # Build Sales Executive Predictor
-cd pridict-sales-executive
+cd predict-sales-executive
 docker build -t sales-executive-predictor .
 
 # Build Deal DNA Analyzer

@@ -282,7 +282,7 @@ cd crm
 
 ### 5. Run Flask Services
 ```bash
-cd pridict-sales-executive
+cd predict-sales-executive
 python app.py
 
 cd dna

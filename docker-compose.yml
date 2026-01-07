@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -71,7 +69,7 @@ services:
 
   sales-executive-predictor:
     build:
-      context: ./pridict-sales-executive
+      context: ./predict-sales-executive
       dockerfile: Dockerfile
     container_name: sales_executive_predictor
     depends_on:
@@ -81,6 +79,10 @@ services:
       - "5001:5001"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PORT: 5001
+      MODEL_PATH: crm_matching_model.pkl
+      REQUEST_TOPIC: sales-executive-match-request
+      RESPONSE_TOPIC: sales-executive-match-response
     networks:
       - crm_network
     restart: on-failure

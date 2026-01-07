@@ -81,7 +81,7 @@ t/
 │           ├── 📄 application.properties # App configuration
 │           └── 📄 data.sql              # Dummy data
 │
-├── 🗂️ pridict-sales-executive/          # ML Service 1
+├── 🗂️ predict-sales-executive/          # ML Service 1
 │   ├── 📄 app.py                        # Flask app - SE matching
 │   ├── 📄 requirements.txt              # Python dependencies
 │   └── 📄 Dockerfile                    # Container image
