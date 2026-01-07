@@ -991,9 +991,12 @@ export default function CarDealershipCRM({ onLogout, onNavigate }) {
   const fetchDeals = async () => {
     try {
       setLoading(true);
-      // Use salesExecutiveId = 1 for demo (ML service always assigns to Rajesh Kumar ID=1)
-      // In production, this should be currentUser.id
-      const salesExecutiveId = 1;
+      const salesExecutiveId = currentUser?.id;
+      if (!salesExecutiveId) {
+        console.warn('No salesExecutiveId found for current user; cannot load deals');
+        setDeals([]);
+        return;
+      }
       const response = await dealAPI.getSalesExecutiveDeals(salesExecutiveId);
       console.log('Fetched deals:', response);
       

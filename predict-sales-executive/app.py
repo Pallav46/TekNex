@@ -46,10 +46,10 @@ def create_app() -> Flask:
 
 
 if __name__ == "__main__":
-  # Start Kafka consumer/producer loop in the background for CRM integration.
-  worker_thread = threading.Thread(target=kafka_worker.main, daemon=True)
-  worker_thread.start()
+    # Start Kafka consumer/producer loop in the background for CRM integration.
+    worker_thread = threading.Thread(target=kafka_worker.main, daemon=True)
+    worker_thread.start()
 
     app = create_app()
-  port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8000"))
     app.run(host="0.0.0.0", port=port)

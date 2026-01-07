@@ -166,7 +166,9 @@
                     email: email,
                     password: password,
                     phone: '+91-8765432100',
-                    address: 'Mumbai, Maharashtra'
+                    address: 'Mumbai, Maharashtra',
+                    userType: 'sales_executive',
+                    dealerId: 1
                 })
             })
             .then(response => {
@@ -208,7 +210,7 @@
             fetch('http://localhost:8080/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password, userType: 'sales_executive' })
             })
             .then(response => {
                 if (!response.ok) {
@@ -278,12 +280,16 @@
         }
 
         function loadDealsByName() {
-            console.log('Loading deals by matching "Rajesh Kumar" name...');
-            
-            // Since ML service ALWAYS assigns to ID 1 (Rajesh Kumar),
-            // we fetch deals for ID 1 regardless of current logged-in user's actual ID
-            // This works because we ensure only Rajesh Kumar can login to this demo
-            fetch(`http://localhost:8080/api/deals/sales-executive/1`, {
+            console.log('Fallback: loading deals for current logged-in sales executive...');
+
+            if (!seId) {
+                console.log('No seId available; cannot load deals');
+                displayDeals([]);
+                return;
+            }
+
+            // Fallback: try by ID again.
+            fetch(`http://localhost:8080/api/deals/sales-executive/${seId}`, {
                 headers: { 'Authorization': 'Bearer ' + token }
             })
             .then(response => {
@@ -294,7 +300,7 @@
                 throw new Error('Could not load deals');
             })
             .then(deals => {
-                console.log('✓ Found deals assigned to Rajesh Kumar (ID 1):', deals.length);
+                console.log('✓ Found deals assigned to this sales executive:', deals.length);
                 deals.forEach(deal => {
                     console.log(`  Deal ${deal.id}: ${deal.customerName} - ${deal.interestCategory} - ${deal.budgetRange}`);
                 });
@@ -337,14 +343,13 @@
                 
                 // Filter deals assigned to this SE by ID or name
                 const filteredDeals = allDeals.filter(deal => {
-                    const matchById = deal.salesExecutiveId === seId;
+                    const matchById = Number(deal.salesExecutiveId) === Number(seId);
                     const matchByName = deal.salesExecutiveName === seName;
-                    const matchRajesh = deal.salesExecutiveName === 'Rajesh Kumar';
                     const hasAssignment = deal.salesExecutiveId != null;
                     
-                    console.log(`  Deal ${deal.id}: matchById=${matchById}, matchByName=${matchByName}, matchRajesh=${matchRajesh}, hasAssignment=${hasAssignment}`);
+                    console.log(`  Deal ${deal.id}: matchById=${matchById}, matchByName=${matchByName}, hasAssignment=${hasAssignment}`);
                     
-                    return hasAssignment && (matchById || matchByName || matchRajesh);
+                    return hasAssignment && (matchById || matchByName);
                 });
                 
                 console.log('Filtered deals for this SE:', filteredDeals.length);

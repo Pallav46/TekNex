@@ -33,6 +33,29 @@ from kafka import KafkaConsumer, KafkaProducer
 from matcher_inference import predict_salesperson_id
 
 
+def _coerce_sales_executive_id(value: object) -> object:
+    """Convert model IDs like 'SALESP001' to a numeric ID (1).
+
+    CRM backend expects `salesExecutiveId` to be a number (Long).
+    """
+
+    if value is None:
+        return None
+
+    text = str(value)
+    if text.isdigit():
+        return int(text)
+
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits:
+        try:
+            return int(digits)
+        except ValueError:
+            return value
+
+    return value
+
+
 def _normalize_match_request(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Accept both the original CRM request shape and the ML model request shape."""
 
@@ -111,7 +134,7 @@ def main() -> int:
             out = {
                 "dealId": payload.get("dealId"),
                 "customerId": payload.get("customerId"),
-                "salesExecutiveId": int(sales_id) if str(sales_id).isdigit() else sales_id,
+                "salesExecutiveId": _coerce_sales_executive_id(sales_id),
             }
 
             # Also include model-oriented keys for debugging / future consumers.
